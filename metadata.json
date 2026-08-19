@@ -1,0 +1,6 @@
+{
+  "name": "Ana María Salas - Studio & Reservas",
+  "description": "PWA profesional de reservas, catálogo de servicios de cejas y maquillaje, agenda digital y gestión integral con Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

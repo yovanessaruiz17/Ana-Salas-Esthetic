@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /admin/*
+Disallow: /reserva/confirmacion/*
+
+Sitemap: https://your-beauty-studio.netlify.app/sitemap.xml
