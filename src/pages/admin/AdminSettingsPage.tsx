@@ -13,13 +13,23 @@ import {
   RefreshCw,
   Copy,
   ExternalLink,
+  Key,
+  Globe,
+  UploadCloud,
+  Code2,
 } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/common/Button';
 import { Input, TextArea } from '../../components/common/Input';
+import { Modal } from '../../components/common/Modal';
 import { SiteSettings } from '../../types';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { 
+  getSupabaseCredentials, 
+  configureSupabaseRuntime, 
+  testSupabaseConnection, 
+  isSupabaseConfigured 
+} from '../../lib/supabase';
 import { dataStore } from '../../lib/dataStore';
 
 export const AdminSettingsPage: React.FC = () => {
@@ -29,13 +39,33 @@ export const AdminSettingsPage: React.FC = () => {
   const [formData, setFormData] = useState<SiteSettings>(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Supabase Runtime Config State
+  const initialCreds = getSupabaseCredentials();
+  const [supabaseUrl, setSupabaseUrl] = useState(initialCreds.url);
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState(initialCreds.anonKey);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    tested: boolean;
+    connected: boolean;
+    message: string;
+  }>({
+    tested: false,
+    connected: isSupabaseConfigured,
+    message: isSupabaseConfigured 
+      ? 'Conectado a la base de datos Supabase.' 
+      : 'Modo local activo. Ingresa tus credenciales para sincronizar en la nube.',
+  });
+
+  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSaveBusinessSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsSaving(true);
@@ -58,6 +88,46 @@ export const AdminSettingsPage: React.FC = () => {
     }
   };
 
+  const handleSaveAndTestSupabase = async () => {
+    if (!supabaseUrl.trim() || !supabaseAnonKey.trim()) {
+      showToast({
+        type: 'warning',
+        title: 'Campos requeridos',
+        message: 'Por favor ingresa la URL y la Anon Key de Supabase.',
+      });
+      return;
+    }
+
+    try {
+      setIsTestingConnection(true);
+      configureSupabaseRuntime(supabaseUrl, supabaseAnonKey);
+      const test = await testSupabaseConnection(supabaseUrl, supabaseAnonKey);
+
+      setConnectionStatus({
+        tested: true,
+        connected: test.success,
+        message: test.message,
+      });
+
+      if (test.success) {
+        showToast({
+          type: 'success',
+          title: 'Conexión Exitosa',
+          message: test.message,
+        });
+        await dataStore.fetchFromSupabase();
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Fallo de Conexión',
+          message: test.message,
+        });
+      }
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
   const handleSyncSupabase = async () => {
     try {
       setIsSyncing(true);
@@ -65,7 +135,7 @@ export const AdminSettingsPage: React.FC = () => {
       showToast({
         type: 'success',
         title: 'Sincronización Completa',
-        message: 'Se han sincronizado las citas, servicios, horarios y reseñas.',
+        message: 'Se han sincronizado las citas, servicios, categorías, horarios y reseñas desde Supabase.',
       });
     } catch (err: any) {
       showToast({
@@ -78,52 +148,85 @@ export const AdminSettingsPage: React.FC = () => {
     }
   };
 
+  const handleExportLocalToSupabase = async () => {
+    try {
+      setIsExporting(true);
+      const res = await dataStore.syncAllLocalDataToSupabase();
+      if (res.success) {
+        showToast({
+          type: 'success',
+          title: 'Exportación Exitosa',
+          message: res.message,
+        });
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Error de Exportación',
+          message: res.message,
+        });
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleCopySql = () => {
+    const sqlText = `-- Ejecuta este script en Supabase -> SQL Editor -> New query -> Run
+-- Visita el archivo supabase/schema.sql en el proyecto para el script completo`;
+    navigator.clipboard.writeText(sqlText);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
+    showToast({
+      type: 'success',
+      title: 'Copiado',
+      message: 'Instrucciones copiadas al portapapeles.',
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
         <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D2726]">
-          Configuración del Negocio & Supabase
+          Configuración del Negocio & Base de Datos
         </h2>
         <p className="text-xs sm:text-sm text-[#7A6D69] mt-0.5">
-          Ajusta la información comercial, WhatsApp de reservas, enlaces de redes y revisa el estado de conexión con Supabase.
+          Gestiona las credenciales de Supabase en la nube, sincronización multi-dispositivo y los datos de contacto del estudio.
         </p>
       </div>
 
-      {/* Supabase Connection Status Card */}
-      <div className={`p-6 rounded-3xl border shadow-xs ${
-        isSupabaseConfigured 
-          ? 'bg-emerald-50/70 border-emerald-200' 
-          : 'bg-amber-50/80 border-amber-200'
+      {/* Supabase Connection Card */}
+      <div className={`p-6 sm:p-8 rounded-3xl border shadow-xs space-y-6 ${
+        connectionStatus.connected 
+          ? 'bg-emerald-50/60 border-emerald-200' 
+          : 'bg-amber-50/70 border-amber-200'
       }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 pb-5">
           <div className="flex items-start gap-3">
-            <div className={`p-2.5 rounded-2xl ${
-              isSupabaseConfigured ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
+            <div className={`p-3 rounded-2xl ${
+              connectionStatus.connected ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
             }`}>
-              <Database className="w-5 h-5" />
+              <Database className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-serif font-bold text-base text-[#2D2726]">
-                  Estado de la Base de Datos Supabase
+                <h3 className="font-serif font-bold text-lg text-[#2D2726]">
+                  Conexión con Supabase (Nube)
                 </h3>
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                  isSupabaseConfigured
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                  connectionStatus.connected
                     ? 'bg-emerald-200 text-emerald-900'
                     : 'bg-amber-200 text-amber-900'
                 }`}>
-                  {isSupabaseConfigured ? '🟢 Conectado en Tiempo Real' : '🟡 Modo Local Reactivo Activo'}
+                  {connectionStatus.connected ? '🟢 Conectado a la Base de Datos' : '🟡 Modo Local Reactivo'}
                 </span>
               </div>
-              <p className="text-xs text-[#7A6D69] mt-1 leading-relaxed">
-                {isSupabaseConfigured
-                  ? 'La aplicación está conectada con Supabase. Todas las reservas, reseñas, servicios y cambios de horario se guardan y sincronizan en la nube en tiempo real.'
-                  : 'La aplicación está funcionando de forma reactiva en almacenamiento local interactivo. Para conectar tu base de datos Supabase en la nube, ingresa tus variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en la configuración del proyecto y ejecuta el archivo supabase/schema.sql en tu consola de Supabase.'}
+              <p className="text-xs text-[#6E625F] mt-1 leading-relaxed max-w-2xl">
+                {connectionStatus.message}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
             <Button
               variant="outline"
               size="sm"
@@ -131,14 +234,76 @@ export const AdminSettingsPage: React.FC = () => {
               isLoading={isSyncing}
               leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
             >
-              Sincronizar Ahora
+              Sincronizar
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportLocalToSupabase}
+              isLoading={isExporting}
+              leftIcon={<UploadCloud className="w-3.5 h-3.5" />}
+              title="Sube los servicios y categorías locales a tu base de datos Supabase"
+            >
+              Exportar a Supabase
+            </Button>
+          </div>
+        </div>
+
+        {/* Credentials Inputs */}
+        <div className="space-y-4 pt-1">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#6E625F] flex items-center gap-1.5">
+            <Key className="w-3.5 h-3.5 text-[#C5A880]" />
+            Credenciales de Proyecto Supabase
+          </h4>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Supabase URL (Project URL)"
+              placeholder="https://tu-proyecto.supabase.co"
+              value={supabaseUrl}
+              onChange={(e) => setSupabaseUrl(e.target.value)}
+              icon={<Globe className="w-4 h-4" />}
+            />
+
+            <Input
+              label="Supabase Anon Key (Public Key)"
+              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+              type="password"
+              value={supabaseAnonKey}
+              onChange={(e) => setSupabaseAnonKey(e.target.value)}
+              icon={<Key className="w-4 h-4" />}
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2">
+              <a
+                href="https://supabase.com/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#8C6D40] hover:underline"
+              >
+                <span>Obtener credenciales en Supabase Dashboard</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <Button
+              variant="gold"
+              size="sm"
+              onClick={handleSaveAndTestSupabase}
+              isLoading={isTestingConnection}
+              leftIcon={<CheckCircle2 className="w-4 h-4" />}
+            >
+              Guardar y Probar Conexión
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Business Identity Form */}
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSaveBusinessSettings}
         className="bg-white rounded-3xl border border-[#E8DFC8] p-6 sm:p-10 shadow-xs space-y-8"
       >
         {/* Basic Info */}
@@ -227,7 +392,7 @@ export const AdminSettingsPage: React.FC = () => {
                   whatsapp: e.target.value,
                 }))
               }
-              helperText="A este número se enviarán los enlaces de WhatsApp generados para las clientas."
+              helperText="Número para recibir confirmaciones de citas y dudas de clientas."
               icon={<Phone className="w-4 h-4" />}
               required
             />

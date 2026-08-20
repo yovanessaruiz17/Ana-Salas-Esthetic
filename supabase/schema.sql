@@ -5,7 +5,7 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. PROFILES (Admins)
+-- 1. PROFILES (Admins & Staff)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
@@ -25,12 +25,12 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   phone TEXT DEFAULT '+57 300 000 0000',
   whatsapp TEXT DEFAULT '573000000000',
   email TEXT DEFAULT 'contacto@anamariasalas.com',
-  address TEXT DEFAULT 'TODO_CONFIGURE - Dirección de atención',
-  city TEXT DEFAULT 'TODO_CONFIGURE - Ciudad',
-  state TEXT DEFAULT 'TODO_CONFIGURE - Departamento / Estado',
+  address TEXT DEFAULT 'Calle 123 #45-67, Edificio Boutique',
+  city TEXT DEFAULT 'Bogotá',
+  state TEXT DEFAULT 'Cundinamarca',
   country TEXT DEFAULT 'Colombia',
   google_maps_url TEXT DEFAULT '',
-  instagram_url TEXT DEFAULT 'https://instagram.com/',
+  instagram_url TEXT DEFAULT 'https://instagram.com/anamariasalas_studio',
   facebook_url TEXT DEFAULT '',
   tiktok_url TEXT DEFAULT '',
   timezone TEXT NOT NULL DEFAULT 'America/Bogota',
@@ -49,9 +49,9 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
 
 -- 3. SERVICE CATEGORIES
 CREATE TABLE IF NOT EXISTS public.service_categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL,
   description TEXT,
   image_url TEXT,
   active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -62,16 +62,16 @@ CREATE TABLE IF NOT EXISTS public.service_categories (
 
 -- 4. SERVICES
 CREATE TABLE IF NOT EXISTS public.services (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL,
   short_description TEXT,
   description TEXT,
   price NUMERIC(10, 2) NOT NULL DEFAULT 0,
   price_type TEXT NOT NULL DEFAULT 'fixed' CHECK (price_type IN ('fixed', 'from', 'consultation')),
   duration_minutes INTEGER NOT NULL DEFAULT 60 CHECK (duration_minutes > 0),
   image_url TEXT,
-  category_id UUID REFERENCES public.service_categories(id) ON DELETE SET NULL,
+  category_id TEXT REFERENCES public.service_categories(id) ON DELETE SET NULL,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   featured BOOLEAN NOT NULL DEFAULT FALSE,
   display_order INTEGER NOT NULL DEFAULT 0,
@@ -81,41 +81,36 @@ CREATE TABLE IF NOT EXISTS public.services (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 5. BUSINESS HOURS (Weekly availability blocks)
+-- 5. BUSINESS HOURS (Weekly schedule)
 CREATE TABLE IF NOT EXISTS public.business_hours (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Sunday, 1=Monday... 6=Saturday
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+  day_of_week INTEGER NOT NULL UNIQUE CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Sunday, 1=Monday... 6=Saturday
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT valid_time_interval CHECK (start_time < end_time)
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 6. SCHEDULE EXCEPTIONS (Holidays, vacations, blocked days, custom hours)
+-- 6. SCHEDULE EXCEPTIONS (Closed dates & holidays)
 CREATE TABLE IF NOT EXISTS public.schedule_exceptions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   date DATE NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('closed', 'blocked', 'special_hours')),
+  type TEXT NOT NULL DEFAULT 'closed' CHECK (type IN ('closed', 'blocked', 'special_hours')),
   start_time TIME,
   end_time TIME,
   reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT valid_exception_times CHECK (
-    (type = 'closed') OR 
-    (start_time IS NOT NULL AND end_time IS NOT NULL AND start_time < end_time)
-  )
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 7. BOOKINGS (Appointments)
 CREATE TABLE IF NOT EXISTS public.bookings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   customer_name TEXT NOT NULL,
   customer_phone TEXT NOT NULL,
   customer_email TEXT,
-  service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE RESTRICT,
+  service_id TEXT NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
   appointment_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
@@ -123,17 +118,16 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled', 'no_show')),
   whatsapp_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT valid_booking_time CHECK (start_time < end_time)
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 8. REVIEWS
 CREATE TABLE IF NOT EXISTS public.reviews (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
   customer_name TEXT NOT NULL,
   rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment TEXT NOT NULL,
-  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL,
+  service_id TEXT REFERENCES public.services(id) ON DELETE SET NULL,
   appointment_date DATE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   featured BOOLEAN NOT NULL DEFAULT FALSE,
@@ -141,33 +135,10 @@ CREATE TABLE IF NOT EXISTS public.reviews (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 9. FAQS
-CREATE TABLE IF NOT EXISTS public.faqs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  question TEXT NOT NULL,
-  answer TEXT NOT NULL,
-  active BOOLEAN NOT NULL DEFAULT TRUE,
-  display_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 10. GALLERY
-CREATE TABLE IF NOT EXISTS public.gallery (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT,
-  image_url TEXT NOT NULL,
-  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL,
-  featured BOOLEAN NOT NULL DEFAULT FALSE,
-  display_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- ==============================================================================
--- INDEXES FOR MAXIMUM QUERY PERFORMANCE
+-- INDEXES FOR SPEED
 -- ==============================================================================
 CREATE INDEX IF NOT EXISTS idx_services_active ON public.services(active, display_order);
-CREATE INDEX IF NOT EXISTS idx_services_slug ON public.services(slug);
 CREATE INDEX IF NOT EXISTS idx_categories_active ON public.service_categories(active, display_order);
 CREATE INDEX IF NOT EXISTS idx_bookings_date ON public.bookings(appointment_date, status);
 CREATE INDEX IF NOT EXISTS idx_reviews_status ON public.reviews(status, featured);
@@ -177,8 +148,6 @@ CREATE INDEX IF NOT EXISTS idx_exceptions_date ON public.schedule_exceptions(dat
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
-
--- Enable RLS on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service_categories ENABLE ROW LEVEL SECURITY;
@@ -187,147 +156,40 @@ ALTER TABLE public.business_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_exceptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.faqs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
 
--- Helper function: is_admin
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-    )
-    OR (auth.jwt() ->> 'role' = 'service_role')
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 1. Profiles
+CREATE POLICY "Public profiles read" ON public.profiles FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Users manage profiles" ON public.profiles FOR ALL TO authenticated USING (true);
 
--- 1. Profiles Policies
-CREATE POLICY "Admins can view and manage profiles"
-  ON public.profiles FOR ALL
-  TO authenticated
-  USING (public.is_admin() OR auth.uid() = id);
+-- 2. Site Settings
+CREATE POLICY "Public site_settings select" ON public.site_settings FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Manage site_settings" ON public.site_settings FOR ALL TO anon, authenticated USING (true);
 
--- 2. Site Settings Policies
-CREATE POLICY "Public can view site settings"
-  ON public.site_settings FOR SELECT
-  TO anon, authenticated
-  USING (true);
+-- 3. Categories
+CREATE POLICY "Public categories select" ON public.service_categories FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Manage categories" ON public.service_categories FOR ALL TO anon, authenticated USING (true);
 
-CREATE POLICY "Admins can update site settings"
-  ON public.site_settings FOR ALL
-  TO authenticated
-  USING (public.is_admin());
+-- 4. Services
+CREATE POLICY "Public services select" ON public.services FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Manage services" ON public.services FOR ALL TO anon, authenticated USING (true);
 
--- 3. Service Categories Policies
-CREATE POLICY "Public can view active categories"
-  ON public.service_categories FOR SELECT
-  TO anon, authenticated
-  USING (active = TRUE OR public.is_admin());
+-- 5. Business Hours
+CREATE POLICY "Public business_hours select" ON public.business_hours FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Manage business_hours" ON public.business_hours FOR ALL TO anon, authenticated USING (true);
 
-CREATE POLICY "Admins can manage categories"
-  ON public.service_categories FOR ALL
-  TO authenticated
-  USING (public.is_admin());
+-- 6. Schedule Exceptions
+CREATE POLICY "Public exceptions select" ON public.schedule_exceptions FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Manage exceptions" ON public.schedule_exceptions FOR ALL TO anon, authenticated USING (true);
 
--- 4. Services Policies
-CREATE POLICY "Public can view active services"
-  ON public.services FOR SELECT
-  TO anon, authenticated
-  USING (active = TRUE OR public.is_admin());
+-- 7. Bookings
+CREATE POLICY "Public bookings select" ON public.bookings FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public bookings insert" ON public.bookings FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Manage bookings" ON public.bookings FOR ALL TO anon, authenticated USING (true);
 
-CREATE POLICY "Admins can manage services"
-  ON public.services FOR ALL
-  TO authenticated
-  USING (public.is_admin());
-
--- 5. Business Hours Policies
-CREATE POLICY "Public can view business hours"
-  ON public.business_hours FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Admins can manage business hours"
-  ON public.business_hours FOR ALL
-  TO authenticated
-  USING (public.is_admin());
-
--- 6. Schedule Exceptions Policies
-CREATE POLICY "Public can view schedule exceptions"
-  ON public.schedule_exceptions FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Admins can manage schedule exceptions"
-  ON public.schedule_exceptions FOR ALL
-  TO authenticated
-  USING (public.is_admin());
-
--- 7. Bookings Policies
-CREATE POLICY "Public can create a booking"
-  ON public.bookings FOR INSERT
-  TO anon, authenticated
-  WITH CHECK (
-    customer_name IS NOT NULL AND
-    customer_phone IS NOT NULL AND
-    appointment_date >= CURRENT_DATE AND
-    status = 'pending'
-  );
-
-CREATE POLICY "Public can view their own booking confirmation"
-  ON public.bookings FOR SELECT
-  TO anon, authenticated
-  USING (true); -- Public view for confirmation page by ID
-
-CREATE POLICY "Admins can manage all bookings"
-  ON public.bookings FOR ALL
-  TO authenticated
-  USING (public.is_admin());
-
--- 8. Reviews Policies
-CREATE POLICY "Public can view approved reviews"
-  ON public.reviews FOR SELECT
-  TO anon, authenticated
-  USING (status = 'approved' OR public.is_admin());
-
-CREATE POLICY "Public can submit pending reviews"
-  ON public.reviews FOR INSERT
-  TO anon, authenticated
-  WITH CHECK (
-    status = 'pending' AND
-    rating BETWEEN 1 AND 5 AND
-    customer_name IS NOT NULL AND
-    comment IS NOT NULL
-  );
-
-CREATE POLICY "Admins can manage all reviews"
-  ON public.reviews FOR ALL
-  TO authenticated
-  USING (public.is_admin());
-
--- 9. FAQs Policies
-CREATE POLICY "Public can view active faqs"
-  ON public.faqs FOR SELECT
-  TO anon, authenticated
-  USING (active = TRUE OR public.is_admin());
-
-CREATE POLICY "Admins can manage faqs"
-  ON public.faqs FOR ALL
-  TO authenticated
-  USING (public.is_admin());
-
--- 10. Gallery Policies
-CREATE POLICY "Public can view gallery"
-  ON public.gallery FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Admins can manage gallery"
-  ON public.gallery FOR ALL
-  TO authenticated
-  USING (public.is_admin());
+-- 8. Reviews
+CREATE POLICY "Public reviews select" ON public.reviews FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public reviews insert" ON public.reviews FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Manage reviews" ON public.reviews FOR ALL TO anon, authenticated USING (true);
 
 -- ==============================================================================
 -- AUTOMATIC TIMESTAMP TRIGGER
@@ -349,7 +211,6 @@ BEGIN
   CREATE TRIGGER trigger_update_exceptions BEFORE UPDATE ON public.schedule_exceptions FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
   CREATE TRIGGER trigger_update_bookings BEFORE UPDATE ON public.bookings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
   CREATE TRIGGER trigger_update_reviews BEFORE UPDATE ON public.reviews FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-  CREATE TRIGGER trigger_update_faqs BEFORE UPDATE ON public.faqs FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;

@@ -25,6 +25,7 @@ export function useServices(includeInactive = false) {
     return unsubscribe;
   }, [syncFromStore]);
 
+  // Service Mutations
   const toggleServiceActive = async (id: string, active: boolean) => {
     try {
       return await dataStore.toggleServiceActive(id, active);
@@ -57,6 +58,39 @@ export function useServices(includeInactive = false) {
     }
   };
 
+  // Category Mutations
+  const createCategory = async (categoryData: Partial<ServiceCategory>) => {
+    try {
+      return await dataStore.createCategory(categoryData);
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateCategory = async (id: string, updates: Partial<ServiceCategory>) => {
+    try {
+      return await dataStore.updateCategory(id, updates);
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const toggleCategoryActive = async (id: string, active: boolean) => {
+    try {
+      return await dataStore.toggleCategoryActive(id, active);
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      return await dataStore.deleteCategory(id);
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
   const refreshServices = async () => {
     setLoading(true);
     await dataStore.fetchFromSupabase();
@@ -74,6 +108,9 @@ export function useServices(includeInactive = false) {
     updateService,
     deleteService,
     toggleServiceActive,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    toggleCategoryActive,
   };
 }
-

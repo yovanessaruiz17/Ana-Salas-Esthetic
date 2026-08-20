@@ -8,13 +8,14 @@ import {
   Send,
   Sparkles,
   MessageCircle,
-  CheckCircle2,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Input, TextArea } from '../../components/common/Input';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneDisplay } from '../../utils/formatters';
+import { generateWhatsAppLink, buildGeneralInquiryWhatsAppMessage } from '../../utils/whatsapp';
 
 export const ContactPage: React.FC = () => {
   const { settings } = useSettings();
@@ -28,6 +29,9 @@ export const ContactPage: React.FC = () => {
     honeypot: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const displayPhone = settings.whatsapp || settings.phone || '573001234567';
+  const rawWhatsApp = (settings.whatsapp || settings.phone || '573001234567').replace(/\D/g, '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,22 +47,25 @@ export const ContactPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    // WhatsApp direct fallback
-    const msg = `Hola ${settings?.professional_name || 'Ana'}, mi nombre es ${form.name}. ${form.message}`;
-    const cleanPhone = (settings?.whatsapp_number || '+573001234567').replace(/\D/g, '');
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    const msg = `Hola ${settings.professional_name || 'Ana María'}, mi nombre es ${form.name.trim()}. ${form.message.trim()}`;
+    const waUrl = generateWhatsAppLink(rawWhatsApp, msg);
 
     setTimeout(() => {
       setIsSubmitting(false);
       showToast({
         type: 'success',
-        title: 'Mensaje Listo',
+        title: 'Mensaje Preparado',
         message: 'Abriendo WhatsApp para comunicarte con Ana María Salas...',
       });
       window.open(waUrl, '_blank', 'noopener,noreferrer');
       setForm({ name: '', phone: '', email: '', message: '', honeypot: '' });
-    }, 400);
+    }, 300);
   };
+
+  const generalWhatsAppUrl = generateWhatsAppLink(
+    rawWhatsApp,
+    buildGeneralInquiryWhatsAppMessage(settings)
+  );
 
   return (
     <div className="py-10 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-12">
@@ -84,6 +91,7 @@ export const ContactPage: React.FC = () => {
           </h2>
 
           <div className="space-y-5">
+            {/* Address */}
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[#FAF4ED] border border-[#EBDBC9] flex items-center justify-center text-[#8C6D40] flex-shrink-0">
                 <MapPin className="w-5 h-5" />
@@ -93,28 +101,41 @@ export const ContactPage: React.FC = () => {
                   Dirección
                 </h3>
                 <p className="text-sm font-medium text-[#2D2726] mt-0.5">
-                  {settings.address || 'Calle 123 #45-67, Estudio Privado'}
+                  {settings.address || 'Atención exclusiva en estudio privado'}
                 </p>
                 <p className="text-xs text-[#7A6D69]">
-                  {settings.city || 'Atención exclusiva con cita previa'}
+                  {settings.city ? `${settings.city}${settings.country ? `, ${settings.country}` : ''}` : 'Cita previa requerida'}
                 </p>
               </div>
             </div>
 
+            {/* WhatsApp */}
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[#FAF4ED] border border-[#EBDBC9] flex items-center justify-center text-[#8C6D40] flex-shrink-0">
-                <Phone className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-[#25D366]/10 border border-[#25D366]/30 flex items-center justify-center text-[#25D366] flex-shrink-0">
+                <MessageCircle className="w-5 h-5" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[#A39793]">
-                  WhatsApp / Reservas
+                  WhatsApp de Reservas
                 </h3>
-                <p className="text-sm font-medium text-[#2D2726] mt-0.5 font-mono">
-                  {formatPhoneDisplay(settings.whatsapp_number)}
-                </p>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <p className="text-sm font-bold text-[#2D2726] font-mono">
+                    {formatPhoneDisplay(displayPhone)}
+                  </p>
+                  <a
+                    href={generalWhatsAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#25D366] hover:underline"
+                  >
+                    <span>Chatear</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
 
+            {/* Email */}
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[#FAF4ED] border border-[#EBDBC9] flex items-center justify-center text-[#8C6D40] flex-shrink-0">
                 <Mail className="w-5 h-5" />
@@ -124,11 +145,12 @@ export const ContactPage: React.FC = () => {
                   Correo Electrónico
                 </h3>
                 <p className="text-sm font-medium text-[#2D2726] mt-0.5">
-                  {settings.contact_email || 'contacto@anamariasalas.com'}
+                  {settings.email || 'contacto@anamariasalas.com'}
                 </p>
               </div>
             </div>
 
+            {/* Schedule */}
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-[#FAF4ED] border border-[#EBDBC9] flex items-center justify-center text-[#8C6D40] flex-shrink-0">
                 <Clock className="w-5 h-5" />
@@ -141,7 +163,7 @@ export const ContactPage: React.FC = () => {
                   Lunes a Sábado: 8:00 AM – 6:00 PM
                 </p>
                 <p className="text-xs text-[#7A6D69]">
-                  Domingos: Cerrado (o eventos especiales)
+                  Domingos: Citas especiales
                 </p>
               </div>
             </div>

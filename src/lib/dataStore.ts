@@ -13,7 +13,7 @@ import {
   SiteSettings, 
   SpecialClosedDate 
 } from '../types';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, getSupabaseCredentials } from './supabase';
 import { DEFAULT_SITE_SETTINGS } from './constants';
 import { addMinutesToTime, getTodayDateString, addDays } from '../utils/dates';
 
@@ -38,10 +38,26 @@ export interface DayScheduleConfig {
   is_closed: boolean;
 }
 
-// Initial Seed Data
+// Generate valid RFC4122 compliant UUIDs for Supabase & local state
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // fallback
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+// Initial Seed Data with valid UUIDs
 const DEFAULT_CATEGORIES: ServiceCategory[] = [
   {
-    id: 'cat-cejas',
+    id: 'c0000001-0000-0000-0000-000000000001',
     name: 'Diseño de Cejas',
     slug: 'diseno-de-cejas',
     description: 'Técnicas avanzadas de visagismo, depilación con hilo y micropigmentación.',
@@ -52,7 +68,7 @@ const DEFAULT_CATEGORIES: ServiceCategory[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'cat-pestanas',
+    id: 'c0000002-0000-0000-0000-000000000002',
     name: 'Pestañas',
     slug: 'pestanas',
     description: 'Lifting natural, tinte y nutrición intensiva de keratina.',
@@ -63,7 +79,7 @@ const DEFAULT_CATEGORIES: ServiceCategory[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'cat-maquillaje',
+    id: 'c0000003-0000-0000-0000-000000000003',
     name: 'Maquillaje Profesional',
     slug: 'maquillaje-profesional',
     description: 'Maquillaje social, de gala y novias con técnicas de alta duración.',
@@ -77,7 +93,7 @@ const DEFAULT_CATEGORIES: ServiceCategory[] = [
 
 const DEFAULT_SERVICES: Service[] = [
   {
-    id: 'svc-1',
+    id: 's0000001-0000-0000-0000-000000000001',
     name: 'Diseño & Depilación con Hilo',
     slug: 'diseno-depilacion-hilo',
     short_description: 'Mapeo facial con visagismo y depilación precisa con hilo antibacteriano.',
@@ -86,7 +102,7 @@ const DEFAULT_SERVICES: Service[] = [
     price_type: 'fixed',
     duration_minutes: 45,
     image_url: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&auto=format&fit=crop&q=80',
-    category_id: 'cat-cejas',
+    category_id: 'c0000001-0000-0000-0000-000000000001',
     active: true,
     featured: true,
     display_order: 1,
@@ -96,7 +112,7 @@ const DEFAULT_SERVICES: Service[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'svc-2',
+    id: 's0000002-0000-0000-0000-000000000002',
     name: 'Laminado de Cejas & Tinte de Henna',
     slug: 'laminado-cejas-henna',
     short_description: 'Fijación, alineación y nutrición de vellos con tinte orgánico sombreado.',
@@ -105,7 +121,7 @@ const DEFAULT_SERVICES: Service[] = [
     price_type: 'fixed',
     duration_minutes: 60,
     image_url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80',
-    category_id: 'cat-cejas',
+    category_id: 'c0000001-0000-0000-0000-000000000001',
     active: true,
     featured: true,
     display_order: 2,
@@ -115,7 +131,7 @@ const DEFAULT_SERVICES: Service[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'svc-3',
+    id: 's0000003-0000-0000-0000-000000000002',
     name: 'Lifting de Pestañas + Keratina',
     slug: 'lifting-pestanas-keratina',
     short_description: 'Curvatura natural y baño de color negro intenso para alargar tus pestañas.',
@@ -124,7 +140,7 @@ const DEFAULT_SERVICES: Service[] = [
     price_type: 'fixed',
     duration_minutes: 60,
     image_url: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&auto=format&fit=crop&q=80',
-    category_id: 'cat-pestanas',
+    category_id: 'c0000002-0000-0000-0000-000000000002',
     active: true,
     featured: true,
     display_order: 3,
@@ -134,7 +150,7 @@ const DEFAULT_SERVICES: Service[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'svc-4',
+    id: 's0000004-0000-0000-0000-000000000003',
     name: 'Maquillaje Social de Alta Gama',
     slug: 'maquillaje-social-alta-gama',
     short_description: 'Técnicas blindadas, preparación de piel premium y pestañas postizas incluidas.',
@@ -143,7 +159,7 @@ const DEFAULT_SERVICES: Service[] = [
     price_type: 'from',
     duration_minutes: 90,
     image_url: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800&auto=format&fit=crop&q=80',
-    category_id: 'cat-maquillaje',
+    category_id: 'c0000003-0000-0000-0000-000000000003',
     active: true,
     featured: true,
     display_order: 4,
@@ -158,11 +174,11 @@ const todayStr = getTodayDateString();
 
 const DEFAULT_BOOKINGS: Booking[] = [
   {
-    id: 'bk-seed-101',
+    id: 'b0000001-0000-0000-0000-000000000001',
     customer_name: 'Isabella Gómez',
     customer_phone: '+57 312 456 7890',
     customer_email: 'isabella@ejemplo.com',
-    service_id: 'svc-1',
+    service_id: 's0000001-0000-0000-0000-000000000001',
     appointment_date: todayStr,
     start_time: '09:00:00',
     end_time: '09:45:00',
@@ -173,11 +189,11 @@ const DEFAULT_BOOKINGS: Booking[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'bk-seed-102',
+    id: 'b0000002-0000-0000-0000-000000000002',
     customer_name: 'Mariana Duarte',
     customer_phone: '+57 300 987 6543',
     customer_email: 'mariana.d@ejemplo.com',
-    service_id: 'svc-2',
+    service_id: 's0000002-0000-0000-0000-000000000002',
     appointment_date: todayStr,
     start_time: '11:00:00',
     end_time: '12:00:00',
@@ -188,11 +204,11 @@ const DEFAULT_BOOKINGS: Booking[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'bk-seed-103',
+    id: 'b0000003-0000-0000-0000-000000000003',
     customer_name: 'Daniela Salazar',
     customer_phone: '+57 315 222 3344',
     customer_email: 'daniela.s@ejemplo.com',
-    service_id: 'svc-4',
+    service_id: 's0000004-0000-0000-0000-000000000003',
     appointment_date: addDays(todayStr, 1),
     start_time: '14:00:00',
     end_time: '15:30:00',
@@ -206,11 +222,11 @@ const DEFAULT_BOOKINGS: Booking[] = [
 
 const DEFAULT_REVIEWS: Review[] = [
   {
-    id: 'rev-seed-1',
+    id: 'r0000001-0000-0000-0000-000000000001',
     customer_name: 'Valentina Morales',
     rating: 5,
     comment: '¡El mejor diseño de cejas que me han hecho! La atención de Ana es impecable, súper detallista y el resultado superó todas mis expectativas.',
-    service_id: 'svc-1',
+    service_id: 's0000001-0000-0000-0000-000000000001',
     appointment_date: addDays(todayStr, -5),
     status: 'approved',
     featured: true,
@@ -218,11 +234,11 @@ const DEFAULT_REVIEWS: Review[] = [
     updated_at: new Date(Date.now() - 5 * 86400000).toISOString(),
   },
   {
-    id: 'rev-seed-2',
+    id: 'r0000002-0000-0000-0000-000000000002',
     customer_name: 'Camila Rengifo',
     rating: 5,
     comment: 'El maquillaje para el matrimonio de mi hermana duró toda la noche intacto. La piel quedó luminosa y nada pesada. ¡100% recomendada!',
-    service_id: 'svc-4',
+    service_id: 's0000004-0000-0000-0000-000000000003',
     appointment_date: addDays(todayStr, -10),
     status: 'approved',
     featured: true,
@@ -230,11 +246,11 @@ const DEFAULT_REVIEWS: Review[] = [
     updated_at: new Date(Date.now() - 10 * 86400000).toISOString(),
   },
   {
-    id: 'rev-seed-3',
+    id: 'r0000003-0000-0000-0000-000000000003',
     customer_name: 'Sofía Mendoza',
     rating: 5,
     comment: 'Amé mi lifting de pestañas. Súper natural pero con un cambio increíble en la mirada. El estudio es hermoso y muy acogedor.',
-    service_id: 'svc-3',
+    service_id: 's0000003-0000-0000-0000-000000000002',
     appointment_date: addDays(todayStr, -14),
     status: 'approved',
     featured: true,
@@ -353,17 +369,24 @@ class ReactiveDataStore {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       await this.fetchFromSupabase();
       this.setupSupabaseRealtime();
     }
+  }
+
+  public async reconnect() {
+    this.isInitialized = false;
+    await this.init();
   }
 
   // ==========================================
   // SUPABASE INTEGRATION & REALTIME SYNC
   // ==========================================
   public async fetchFromSupabase() {
-    if (!isSupabaseConfigured || this.isSyncingWithSupabase) return;
+    const creds = getSupabaseCredentials();
+    if (!creds.isConfigured || this.isSyncingWithSupabase) return;
     this.isSyncingWithSupabase = true;
 
     try {
@@ -418,7 +441,7 @@ class ReactiveDataStore {
           .order('appointment_date', { ascending: true })
           .order('start_time', { ascending: true });
 
-        if (bkData) {
+        if (bkData && bkData.length > 0) {
           this.bookings = bkData;
         }
       } catch (e) {
@@ -432,7 +455,7 @@ class ReactiveDataStore {
           .select('*, service:services(*)')
           .order('created_at', { ascending: false });
 
-        if (revData) {
+        if (revData && revData.length > 0) {
           this.reviews = revData;
         }
       } catch (e) {
@@ -447,7 +470,6 @@ class ReactiveDataStore {
           .order('day_of_week', { ascending: true });
 
         if (hoursData && hoursData.length > 0) {
-          // Convert to DayScheduleConfig
           this.businessHours = hoursData.map((h: any) => ({
             id: h.id,
             day_of_week: h.day_of_week,
@@ -469,7 +491,7 @@ class ReactiveDataStore {
           .select('*')
           .order('date', { ascending: true });
 
-        if (excData) {
+        if (excData && excData.length > 0) {
           this.scheduleExceptions = excData.map((ex: any) => ({
             id: ex.id,
             closed_date: ex.date,
@@ -490,7 +512,8 @@ class ReactiveDataStore {
   }
 
   private setupSupabaseRealtime() {
-    if (!isSupabaseConfigured) return;
+    const creds = getSupabaseCredentials();
+    if (!creds.isConfigured) return;
 
     try {
       const channel = supabase
@@ -512,6 +535,208 @@ class ReactiveDataStore {
     }
   }
 
+  // Push local data to Supabase (Initial seed or manual export)
+  public async syncAllLocalDataToSupabase(): Promise<{ success: boolean; message: string }> {
+    const creds = getSupabaseCredentials();
+    if (!creds.isConfigured) {
+      return { success: false, message: 'Supabase no está configurado. Ingresa la URL y Anon Key primero.' };
+    }
+
+    try {
+      // 1. Settings
+      await supabase.from('site_settings').upsert({
+        ...this.settings,
+        id: 'default',
+        updated_at: new Date().toISOString(),
+      });
+
+      // 2. Categories
+      for (const cat of this.categories) {
+        await supabase.from('service_categories').upsert({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description,
+          image_url: cat.image_url,
+          active: cat.active,
+          display_order: cat.display_order,
+        });
+      }
+
+      // 3. Services
+      for (const s of this.services) {
+        await supabase.from('services').upsert({
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          short_description: s.short_description,
+          description: s.description,
+          price: s.price,
+          price_type: s.price_type,
+          duration_minutes: s.duration_minutes,
+          image_url: s.image_url,
+          category_id: s.category_id,
+          active: s.active,
+          featured: s.featured,
+          display_order: s.display_order,
+          preparation_notes: s.preparation_notes,
+          aftercare_notes: s.aftercare_notes,
+        });
+      }
+
+      // 4. Hours
+      for (const h of this.businessHours) {
+        await supabase.from('business_hours').upsert({
+          day_of_week: h.day_of_week,
+          start_time: h.open_time.includes(':00') ? h.open_time : `${h.open_time}:00`,
+          end_time: h.close_time.includes(':00') ? h.close_time : `${h.close_time}:00`,
+          active: !h.is_closed,
+        }, { onConflict: 'day_of_week' });
+      }
+
+      return { success: true, message: '¡Todos los datos locales fueron sincronizados y guardados en Supabase!' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Error al exportar datos a Supabase.' };
+    }
+  }
+
+  // ==========================================
+  // CATEGORIES GETTERS & MUTATIONS
+  // ==========================================
+  public getCategories(includeInactive = false): ServiceCategory[] {
+    const list = this.categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    return includeInactive ? list : list.filter((c) => c.active);
+  }
+
+  public async createCategory(data: Partial<ServiceCategory>): Promise<{ success: boolean; data?: ServiceCategory; error?: string }> {
+    const slug = data.name
+      ? String(data.name)
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+      : `categoria-${Date.now()}`;
+
+    const newId = generateUUID();
+    const newCategory: ServiceCategory = {
+      id: newId,
+      name: data.name?.trim() || 'Nueva Categoría',
+      slug: data.slug?.trim() || slug,
+      description: data.description?.trim() || null,
+      image_url: data.image_url || null,
+      active: data.active !== undefined ? data.active : true,
+      display_order: data.display_order || this.categories.length + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.categories = [...this.categories, newCategory];
+    this.notifyListeners();
+
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
+      try {
+        const { data: dbData, error } = await supabase
+          .from('service_categories')
+          .insert({
+            id: newCategory.id,
+            name: newCategory.name,
+            slug: newCategory.slug,
+            description: newCategory.description,
+            image_url: newCategory.image_url,
+            active: newCategory.active,
+            display_order: newCategory.display_order,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.warn('Supabase createCategory error:', error.message);
+        } else if (dbData) {
+          this.categories = this.categories.map((c) => (c.id === newId ? dbData : c));
+          this.notifyListeners();
+        }
+      } catch (err: any) {
+        console.warn('Supabase createCategory exception:', err);
+      }
+    }
+
+    return { success: true, data: newCategory };
+  }
+
+  public async updateCategory(id: string, updates: Partial<ServiceCategory>): Promise<{ success: boolean; data?: ServiceCategory; error?: string }> {
+    this.categories = this.categories.map((c) => {
+      if (c.id === id) {
+        return {
+          ...c,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return c;
+    });
+
+    const updated = this.categories.find((c) => c.id === id);
+    this.notifyListeners();
+
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured && updated) {
+      try {
+        const payload = {
+          name: updated.name,
+          slug: updated.slug,
+          description: updated.description,
+          image_url: updated.image_url,
+          active: updated.active,
+          display_order: updated.display_order,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+          .from('service_categories')
+          .update(payload)
+          .eq('id', id);
+
+        if (error) console.warn('Supabase updateCategory error:', error.message);
+      } catch (err) {
+        console.warn('Supabase updateCategory exception:', err);
+      }
+    }
+
+    return { success: true, data: updated };
+  }
+
+  public async toggleCategoryActive(id: string, active: boolean): Promise<{ success: boolean; error?: string }> {
+    return this.updateCategory(id, { active });
+  }
+
+  public async deleteCategory(id: string): Promise<{ success: boolean; error?: string }> {
+    // Prevent deletion if services are attached
+    const attachedServices = this.services.filter((s) => s.category_id === id);
+    if (attachedServices.length > 0) {
+      return {
+        success: false,
+        error: `No se puede eliminar la categoría porque tiene ${attachedServices.length} servicio(s) asociados. Reasigna o elimina los servicios primero.`,
+      };
+    }
+
+    this.categories = this.categories.filter((c) => c.id !== id);
+    this.notifyListeners();
+
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
+      try {
+        const { error } = await supabase.from('service_categories').delete().eq('id', id);
+        if (error) console.warn('Supabase deleteCategory error:', error.message);
+      } catch (err) {
+        console.warn('Supabase deleteCategory exception:', err);
+      }
+    }
+
+    return { success: true };
+  }
+
   // ==========================================
   // SERVICES GETTERS & MUTATIONS
   // ==========================================
@@ -527,10 +752,6 @@ class ReactiveDataStore {
     return includeInactive ? list : list.filter((s) => s.active);
   }
 
-  public getCategories(includeInactive = false): ServiceCategory[] {
-    return includeInactive ? this.categories : this.categories.filter((c) => c.active);
-  }
-
   public async createService(formData: ServiceFormData | Partial<Service>): Promise<{ success: boolean; data?: Service; error?: string }> {
     const slug = formData.name
       ? String(formData.name)
@@ -541,7 +762,7 @@ class ReactiveDataStore {
           .replace(/^-|-$/g, '')
       : `servicio-${Date.now()}`;
 
-    const newId = `srv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const newId = generateUUID();
     const isAct = (formData as any).is_active ?? (formData as any).active ?? true;
 
     const newService: Service = {
@@ -567,11 +788,13 @@ class ReactiveDataStore {
     this.services = [...this.services, newService];
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { data, error } = await supabase
           .from('services')
           .insert({
+            id: newService.id,
             name: newService.name,
             slug: newService.slug,
             short_description: newService.short_description,
@@ -622,7 +845,8 @@ class ReactiveDataStore {
     const updated = this.services.find((s) => s.id === id);
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const payload: any = { ...updates, updated_at: new Date().toISOString() };
         if (isAct !== undefined) payload.active = isAct;
@@ -651,7 +875,8 @@ class ReactiveDataStore {
     this.services = this.services.filter((s) => s.id !== id);
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { error } = await supabase.from('services').delete().eq('id', id);
         if (error) console.warn('Supabase deleteService error:', error.message);
@@ -714,7 +939,7 @@ class ReactiveDataStore {
       };
     }
 
-    const newId = `bk-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const newId = generateUUID();
     const matchedService = this.services.find((s) => s.id === formData.service_id);
 
     const newBooking: Booking = {
@@ -737,11 +962,13 @@ class ReactiveDataStore {
     this.bookings = [newBooking, ...this.bookings];
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { data, error } = await supabase
           .from('bookings')
           .insert({
+            id: newBooking.id,
             customer_name: newBooking.customer_name,
             customer_phone: newBooking.customer_phone,
             customer_email: newBooking.customer_email,
@@ -790,7 +1017,8 @@ class ReactiveDataStore {
 
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const updates: any = { status: newStatus, updated_at: new Date().toISOString() };
         if (whatsappConfirmed !== undefined) updates.whatsapp_confirmed = whatsappConfirmed;
@@ -813,7 +1041,8 @@ class ReactiveDataStore {
     this.bookings = this.bookings.filter((b) => b.id !== bookingId);
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { error } = await supabase.from('bookings').delete().eq('id', bookingId);
         if (error) console.warn('Supabase deleteBooking error:', error.message);
@@ -846,7 +1075,7 @@ class ReactiveDataStore {
   }
 
   public async submitReview(formData: ReviewFormData): Promise<{ success: boolean; data?: Review; error?: string }> {
-    const newId = `rev-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const newId = generateUUID();
     const matchedService = this.services.find((s) => s.id === formData.service_id);
 
     const newReview: Review = {
@@ -866,11 +1095,13 @@ class ReactiveDataStore {
     this.reviews = [newReview, ...this.reviews];
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { data, error } = await supabase
           .from('reviews')
           .insert({
+            id: newReview.id,
             customer_name: newReview.customer_name,
             rating: newReview.rating,
             comment: newReview.comment,
@@ -915,7 +1146,8 @@ class ReactiveDataStore {
 
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const updates: any = { status, updated_at: new Date().toISOString() };
         if (featured !== undefined) updates.featured = featured;
@@ -946,7 +1178,8 @@ class ReactiveDataStore {
     this.reviews = this.reviews.filter((r) => r.id !== reviewId);
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
         if (error) console.warn('Supabase deleteReview error:', error.message);
@@ -973,9 +1206,9 @@ class ReactiveDataStore {
     this.businessHours = hoursList;
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
-        // Upsert into Supabase business_hours
         const payload = hoursList.map((h) => ({
           day_of_week: h.day_of_week,
           start_time: h.open_time.includes(':00') ? h.open_time : `${h.open_time}:00`,
@@ -998,7 +1231,7 @@ class ReactiveDataStore {
   }
 
   public async addSpecialClosedDate(closedDate: string, reason?: string): Promise<{ success: boolean; error?: string }> {
-    const newId = `closed-${Date.now()}`;
+    const newId = generateUUID();
     const newEntry: SpecialClosedDate = {
       id: newId,
       closed_date: closedDate,
@@ -1009,11 +1242,13 @@ class ReactiveDataStore {
     this.scheduleExceptions = [...this.scheduleExceptions, newEntry];
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const { data, error } = await supabase
           .from('schedule_exceptions')
           .insert({
+            id: newId,
             date: closedDate,
             type: 'closed',
             reason: newEntry.reason,
@@ -1042,7 +1277,8 @@ class ReactiveDataStore {
     this.scheduleExceptions = this.scheduleExceptions.filter((e) => e.id !== id);
     this.notifyListeners();
 
-    if (isSupabaseConfigured && item) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured && item) {
       try {
         const { error } = await supabase
           .from('schedule_exceptions')
@@ -1073,7 +1309,8 @@ class ReactiveDataStore {
     };
     this.notifyListeners();
 
-    if (isSupabaseConfigured) {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
       try {
         const payload = {
           ...newSettings,
