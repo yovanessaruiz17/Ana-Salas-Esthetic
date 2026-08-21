@@ -2,9 +2,20 @@ import { Booking, Service, SiteSettings } from '../types';
 import { formatCurrency, formatDuration } from './formatters';
 
 export function sanitizePhoneNumber(phone?: string | null): string {
-  // Remove spaces, plus signs, dashes, parentheses
   if (!phone) return '';
-  return String(phone).replace(/[^0-9]/g, '');
+  let clean = String(phone).replace(/[^0-9]/g, '');
+  // If 10 digits starting with 3 (standard Colombian mobile without country prefix), add 57
+  if (clean.length === 10 && clean.startsWith('3')) {
+    clean = '57' + clean;
+  }
+  return clean;
+}
+
+export function getWhatsAppNumber(settings?: SiteSettings | null): string {
+  if (!settings) return '573001234567';
+  const raw = settings.whatsapp?.trim() || settings.phone?.trim() || '';
+  const sanitized = sanitizePhoneNumber(raw);
+  return sanitized || '573001234567';
 }
 
 export function generateWhatsAppLink(phone?: string | null, message: string = ''): string {

@@ -1,12 +1,16 @@
 import React from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
-import { generateWhatsAppLink, buildGeneralInquiryWhatsAppMessage } from '../../utils/whatsapp';
+import {
+  generateWhatsAppLink,
+  buildGeneralInquiryWhatsAppMessage,
+  getWhatsAppNumber,
+} from '../../utils/whatsapp';
 
 export const WhatsAppFloatingButton: React.FC = () => {
   const { settings } = useSettings();
 
-  const rawWhatsApp = (settings.whatsapp || settings.phone || '').replace(/\D/g, '');
+  const rawWhatsApp = getWhatsAppNumber(settings);
   if (!rawWhatsApp) return null;
 
   const whatsappMessage = buildGeneralInquiryWhatsAppMessage(settings);

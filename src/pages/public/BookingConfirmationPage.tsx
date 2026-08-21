@@ -17,7 +17,7 @@ import {
 import { Button } from '../../components/common/Button';
 import { useSettings } from '../../contexts/SettingsContext';
 import { formatDateSpanish, formatTime12h, formatDuration, formatCurrency } from '../../utils/formatters';
-import { generateWhatsAppBookingLink, sanitizePhoneNumber } from '../../utils/whatsapp';
+import { generateWhatsAppBookingLink, getWhatsAppNumber, sanitizePhoneNumber } from '../../utils/whatsapp';
 
 export const BookingConfirmationPage: React.FC = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -49,17 +49,17 @@ export const BookingConfirmationPage: React.FC = () => {
   const service = state?.service;
 
   // Generate WhatsApp Direct Confirmation Link
-  const fallbackWaNumber = sanitizePhoneNumber(settings?.whatsapp_number) || '573001234567';
+  const waTarget = getWhatsAppNumber(settings);
   const whatsappUrl = booking && service
     ? generateWhatsAppBookingLink(
-        settings?.whatsapp_number,
+        waTarget,
         booking.customer_name,
         service.name,
         booking.appointment_date,
         booking.start_time,
         booking.id
       )
-    : `https://wa.me/${fallbackWaNumber}?text=Hola,%20acabo%20de%20solicitar%20una%20reserva%20con%20referencia%20${bookingId || 'PENDIENTE'}`;
+    : `https://wa.me/${waTarget}?text=Hola,%20acabo%20de%20solicitar%20una%20reserva%20con%20referencia%20${bookingId || 'PENDIENTE'}`;
 
   // Google Calendar URL Generator
   const generateGoogleCalendarUrl = () => {

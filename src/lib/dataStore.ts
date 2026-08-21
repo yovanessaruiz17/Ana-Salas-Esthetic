@@ -405,11 +405,12 @@ class ReactiveDataStore {
         const { data: settingsData } = await supabase
           .from('site_settings')
           .select('*')
-          .eq('id', 'default')
+          .limit(1)
           .maybeSingle();
 
         if (settingsData) {
           this.settings = { ...DEFAULT_SITE_SETTINGS, ...settingsData };
+          this.saveToLocalStorage();
         }
       } catch (e) {
         console.warn('Supabase: error fetching site_settings', e);
@@ -426,6 +427,7 @@ class ReactiveDataStore {
         if (!catErr && catData && catData.length > 0) {
           this.categories = catData;
           hasRemoteCategories = true;
+          this.saveToLocalStorage();
         }
       } catch (e) {
         console.warn('Supabase: error fetching service_categories', e);
@@ -442,6 +444,7 @@ class ReactiveDataStore {
         if (!srvErr && srvData && srvData.length > 0) {
           this.services = srvData;
           hasRemoteServices = true;
+          this.saveToLocalStorage();
         }
       } catch (e) {
         console.warn('Supabase: error fetching services', e);
@@ -456,9 +459,9 @@ class ReactiveDataStore {
           .order('start_time', { ascending: true });
 
         if (!bkErr && Array.isArray(bkData)) {
-          // If we got a valid response from Supabase, use it (even if 0 bookings or existing ones)
           if (bkData.length > 0 || hasRemoteServices || hasRemoteCategories) {
             this.bookings = bkData;
+            this.saveToLocalStorage();
           }
         }
       } catch (e) {
@@ -473,9 +476,15 @@ class ReactiveDataStore {
           .order('created_at', { ascending: false });
 
         if (!revErr && Array.isArray(revData)) {
-          if (revData.length > 0 || hasRemoteServices || hasRemoteCategories) {
-            this.reviews = revData;
-          }
+          this.reviews = revData.map((r: any) => {
+            const svc = this.services.find((s) => s.id === r.service_id);
+            return {
+              ...r,
+              service: r.service || svc || null,
+              is_approved: r.status === 'approved',
+            };
+          });
+          this.saveToLocalStorage();
         }
       } catch (e) {
         console.warn('Supabase: error fetching reviews', e);
@@ -498,6 +507,7 @@ class ReactiveDataStore {
             lunch_end: h.lunch_end || '14:00',
             is_closed: h.is_closed !== undefined ? h.is_closed : !h.active,
           }));
+          this.saveToLocalStorage();
         }
       } catch (e) {
         console.warn('Supabase: error fetching business_hours', e);
@@ -518,6 +528,7 @@ class ReactiveDataStore {
               reason: ex.reason || 'Cerrado',
               created_at: ex.created_at,
             }));
+            this.saveToLocalStorage();
           }
         }
       } catch (e) {
@@ -661,7 +672,31 @@ class ReactiveDataStore {
         }, { onConflict: 'day_of_week' });
       }
 
-      return { success: true, message: '¡Todos los datos locales fueron sincronizados y guardados en Supabase!' };
+      // 5. Reviews
+      for (const r of this.reviews) {
+        await supabase.from('reviews').upsert({
+          id: r.id,
+          customer_name: r.customer_name,
+          rating: Number(r.rating) || 5,
+          comment: r.comment,
+          service_id: r.service_id && r.service_id.trim() !== '' ? r.service_id : null,
+          appointment_date: r.appointment_date && r.appointment_date.trim() !== '' ? r.appointment_date : null,
+          status: r.status || 'pending',
+          featured: Boolean(r.featured),
+        });
+      }
+
+      // 6. Exceptions
+      for (const ex of this.scheduleExceptions) {
+        await supabase.from('schedule_exceptions').upsert({
+          id: ex.id,
+          date: ex.closed_date,
+          type: 'closed',
+          reason: ex.reason || 'Cerrado',
+        });
+      }
+
+      return { success: true, message: '¡Todos los datos locales (ajustes, servicios, reseñas, horarios) fueron exportados y sincronizados en Supabase!' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Error al exportar datos a Supabase.' };
     }
@@ -1143,15 +1178,18 @@ class ReactiveDataStore {
 
   public async submitReview(formData: ReviewFormData): Promise<{ success: boolean; data?: Review; error?: string }> {
     const newId = generateUUID();
-    const matchedService = this.services.find((s) => s.id === formData.service_id);
+    const cleanServiceId = formData.service_id && formData.service_id.trim() !== '' ? formData.service_id.trim() : null;
+    const cleanDate = formData.appointment_date && formData.appointment_date.trim() !== '' ? formData.appointment_date.trim() : null;
+    const cleanRating = Math.max(1, Math.min(5, Number(formData.rating) || 5));
+    const matchedService = cleanServiceId ? this.services.find((s) => s.id === cleanServiceId) : null;
 
     const newReview: Review = {
       id: newId,
       customer_name: formData.customer_name.trim(),
-      rating: formData.rating,
+      rating: cleanRating,
       comment: formData.comment.trim(),
-      service_id: formData.service_id || null,
-      appointment_date: formData.appointment_date || null,
+      service_id: cleanServiceId,
+      appointment_date: cleanDate,
       status: 'pending',
       featured: false,
       created_at: new Date().toISOString(),
@@ -1160,6 +1198,7 @@ class ReactiveDataStore {
     };
 
     this.reviews = [newReview, ...this.reviews];
+    this.saveToLocalStorage();
     this.notifyListeners();
 
     const creds = getSupabaseCredentials();
@@ -1183,7 +1222,16 @@ class ReactiveDataStore {
         if (error) {
           console.warn('Supabase submitReview error:', error.message);
         } else if (data) {
-          this.reviews = this.reviews.map((r) => (r.id === newId ? data : r));
+          this.reviews = this.reviews.map((r) =>
+            r.id === newId
+              ? {
+                  ...data,
+                  service: data.service || matchedService || null,
+                  is_approved: data.status === 'approved',
+                }
+              : r
+          );
+          this.saveToLocalStorage();
           this.notifyListeners();
         }
       } catch (err) {
@@ -1205,12 +1253,14 @@ class ReactiveDataStore {
           ...r,
           status,
           featured: featured !== undefined ? featured : r.featured,
+          is_approved: status === 'approved',
           updated_at: new Date().toISOString(),
         };
       }
       return r;
     });
 
+    this.saveToLocalStorage();
     this.notifyListeners();
 
     const creds = getSupabaseCredentials();
@@ -1243,6 +1293,7 @@ class ReactiveDataStore {
 
   public async deleteReview(reviewId: string): Promise<{ success: boolean; error?: string }> {
     this.reviews = this.reviews.filter((r) => r.id !== reviewId);
+    this.saveToLocalStorage();
     this.notifyListeners();
 
     const creds = getSupabaseCredentials();
@@ -1374,14 +1425,15 @@ class ReactiveDataStore {
       ...newSettings,
       updated_at: new Date().toISOString(),
     };
+    this.saveToLocalStorage();
     this.notifyListeners();
 
     const creds = getSupabaseCredentials();
     if (creds.isConfigured) {
       try {
         const payload = {
-          ...newSettings,
-          id: 'default',
+          ...this.settings,
+          id: this.settings.id || 'default',
           updated_at: new Date().toISOString(),
         };
 

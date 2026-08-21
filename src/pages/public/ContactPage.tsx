@@ -15,7 +15,11 @@ import { Input, TextArea } from '../../components/common/Input';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneDisplay } from '../../utils/formatters';
-import { generateWhatsAppLink, buildGeneralInquiryWhatsAppMessage } from '../../utils/whatsapp';
+import {
+  generateWhatsAppLink,
+  buildGeneralInquiryWhatsAppMessage,
+  getWhatsAppNumber,
+} from '../../utils/whatsapp';
 
 export const ContactPage: React.FC = () => {
   const { settings } = useSettings();
@@ -30,8 +34,8 @@ export const ContactPage: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const displayPhone = settings.whatsapp || settings.phone || '573001234567';
-  const rawWhatsApp = (settings.whatsapp || settings.phone || '573001234567').replace(/\D/g, '');
+  const rawWhatsApp = getWhatsAppNumber(settings);
+  const displayPhone = settings.whatsapp || settings.phone || rawWhatsApp;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -100,10 +100,10 @@ export const PublicFooter: React.FC = () => {
                   </span>
                 </li>
               )}
-              {settings.phone && (
+              {(settings.phone || settings.whatsapp) && (
                 <li className="flex items-center gap-2.5">
                   <Phone className="w-4 h-4 text-[#C5A880] flex-shrink-0" />
-                  <span>{settings.phone}</span>
+                  <span>{settings.phone || settings.whatsapp}</span>
                 </li>
               )}
               {settings.email && (
