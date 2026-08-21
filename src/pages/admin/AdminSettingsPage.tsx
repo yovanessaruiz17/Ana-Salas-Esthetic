@@ -45,6 +45,10 @@ export const AdminSettingsPage: React.FC = () => {
   const initialCreds = getSupabaseCredentials();
   const [supabaseUrl, setSupabaseUrl] = useState(initialCreds.url);
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(initialCreds.anonKey);
+  const [credsSource, setCredsSource] = useState({
+    isFromEnv: initialCreds.isFromEnv,
+    isFromLocalStorage: initialCreds.isFromLocalStorage,
+  });
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<{
     tested: boolean;
@@ -54,7 +58,9 @@ export const AdminSettingsPage: React.FC = () => {
     tested: false,
     connected: isSupabaseConfigured,
     message: isSupabaseConfigured 
-      ? 'Conectado a la base de datos Supabase.' 
+      ? initialCreds.isFromEnv
+        ? '🟢 Conexión Global activa (Vía Variables de Entorno Netlify). Todos los clientes y dispositivos están sincronizados.'
+        : '🟡 Conectado en este navegador. Para que clientas desde otros celulares sincronicen reseñas y citas, configura las variables en Netlify.'
       : 'Modo local activo. Ingresa tus credenciales para sincronizar en la nube.',
   });
 
@@ -102,6 +108,12 @@ export const AdminSettingsPage: React.FC = () => {
       setIsTestingConnection(true);
       configureSupabaseRuntime(supabaseUrl, supabaseAnonKey);
       const test = await testSupabaseConnection(supabaseUrl, supabaseAnonKey);
+      const updatedCreds = getSupabaseCredentials();
+
+      setCredsSource({
+        isFromEnv: updatedCreds.isFromEnv,
+        isFromLocalStorage: updatedCreds.isFromLocalStorage,
+      });
 
       setConnectionStatus({
         tested: true,
@@ -342,16 +354,30 @@ export const AdminSettingsPage: React.FC = () => {
 
           <div className="relative">
             <pre className="bg-[#1E1B1A] text-amber-100 p-4 rounded-xl text-xs font-mono max-h-80 overflow-y-auto whitespace-pre-wrap select-all">
-{`-- Habilitar Realtime para sincronización en vivo
-ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.service_categories;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.reviews;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.business_hours;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_exceptions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+{`-- 1. Habilitar Realtime para sincronización en vivo entre todos los dispositivos
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.service_categories;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.reviews;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.business_hours;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_exceptions;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
--- Grants de permisos para clientes públicos
+-- 2. Permisos y Políticas de Reseñas (Permite a clientas anónimas enviar testimonios a moderación)
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public reviews insert" ON public.reviews;
+DROP POLICY IF EXISTS "Public reviews select" ON public.reviews;
+DROP POLICY IF EXISTS "Manage reviews" ON public.reviews;
+
+CREATE POLICY "Public reviews select" ON public.reviews FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public reviews insert" ON public.reviews FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Manage reviews" ON public.reviews FOR ALL TO anon, authenticated USING (true);
+
+-- 3. Grants de permisos para clientes públicos
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;`}

@@ -54,10 +54,19 @@ function createSupabaseInstance(url: string, key: string): SupabaseClient {
 export let supabase: SupabaseClient = createSupabaseInstance(currentUrl, currentKey);
 
 export function getSupabaseCredentials() {
+  const isFromEnv = Boolean(
+    import.meta.env.VITE_SUPABASE_URL &&
+    import.meta.env.VITE_SUPABASE_ANON_KEY &&
+    !import.meta.env.VITE_SUPABASE_URL.includes('your-project')
+  );
+  const isFromLocalStorage = typeof window !== 'undefined' && Boolean(localStorage.getItem('ams_supabase_url'));
+
   return {
     url: currentUrl,
     anonKey: currentKey,
     isConfigured: isSupabaseConfigured,
+    isFromEnv,
+    isFromLocalStorage,
   };
 }
 

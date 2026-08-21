@@ -1067,30 +1067,46 @@ class ReactiveDataStore {
     const creds = getSupabaseCredentials();
     if (creds.isConfigured) {
       try {
-        const { data, error } = await supabase
-          .from('bookings')
-          .insert({
-            id: newBooking.id,
-            customer_name: newBooking.customer_name,
-            customer_phone: newBooking.customer_phone,
-            customer_email: newBooking.customer_email,
-            service_id: newBooking.service_id,
-            appointment_date: newBooking.appointment_date,
-            start_time: newBooking.start_time,
-            end_time: newBooking.end_time,
-            notes: newBooking.notes,
-            status: 'pending',
-            whatsapp_confirmed: false,
-          })
-          .select('*, service:services(*)')
-          .single();
+        const payload: any = {
+          id: newBooking.id,
+          customer_name: newBooking.customer_name,
+          customer_phone: newBooking.customer_phone,
+          customer_email: newBooking.customer_email,
+          service_id: newBooking.service_id,
+          appointment_date: newBooking.appointment_date,
+          start_time: newBooking.start_time,
+          end_time: newBooking.end_time,
+          notes: newBooking.notes,
+          status: 'pending',
+          whatsapp_confirmed: false,
+        };
+
+        const { error } = await supabase.from('bookings').insert([payload]);
 
         if (error) {
           console.warn('Supabase createBooking error:', error.message);
-        } else if (data) {
-          this.bookings = this.bookings.map((b) => (b.id === newId ? data : b));
-          this.notifyListeners();
-          return { success: true, bookingId: data.id };
+          // If foreign key constraint failed on service_id, ensure service exists or retry
+          if (error.code === '23503' && matchedService) {
+            // First upsert the service
+            await supabase.from('services').upsert([{
+              id: matchedService.id,
+              name: matchedService.name,
+              slug: matchedService.slug,
+              short_description: matchedService.short_description,
+              description: matchedService.description,
+              price: matchedService.price,
+              price_type: matchedService.price_type,
+              duration_minutes: matchedService.duration_minutes,
+              category_id: matchedService.category_id || null,
+              active: true,
+              featured: matchedService.featured || false,
+              display_order: matchedService.display_order || 1,
+            }]);
+            const retry = await supabase.from('bookings').insert([payload]);
+            if (retry.error) {
+              console.warn('Supabase createBooking retry error:', retry.error.message);
+            }
+          }
         }
       } catch (err) {
         console.warn('Supabase createBooking exception:', err);
@@ -1204,35 +1220,29 @@ class ReactiveDataStore {
     const creds = getSupabaseCredentials();
     if (creds.isConfigured) {
       try {
-        const { data, error } = await supabase
-          .from('reviews')
-          .insert({
-            id: newReview.id,
-            customer_name: newReview.customer_name,
-            rating: newReview.rating,
-            comment: newReview.comment,
-            service_id: newReview.service_id,
-            appointment_date: newReview.appointment_date,
-            status: 'pending',
-            featured: false,
-          })
-          .select('*, service:services(*)')
-          .single();
+        const payload: any = {
+          id: newReview.id,
+          customer_name: newReview.customer_name,
+          rating: newReview.rating,
+          comment: newReview.comment,
+          status: 'pending',
+          featured: false,
+        };
+        if (newReview.service_id) payload.service_id = newReview.service_id;
+        if (newReview.appointment_date) payload.appointment_date = newReview.appointment_date;
+
+        const { error } = await supabase.from('reviews').insert([payload]);
 
         if (error) {
           console.warn('Supabase submitReview error:', error.message);
-        } else if (data) {
-          this.reviews = this.reviews.map((r) =>
-            r.id === newId
-              ? {
-                  ...data,
-                  service: data.service || matchedService || null,
-                  is_approved: data.status === 'approved',
-                }
-              : r
-          );
-          this.saveToLocalStorage();
-          this.notifyListeners();
+          // If foreign key constraint failed on service_id, retry without service_id
+          if (error.code === '23503' && payload.service_id) {
+            delete payload.service_id;
+            const retryRes = await supabase.from('reviews').insert([payload]);
+            if (retryRes.error) {
+              console.warn('Supabase submitReview retry without service_id error:', retryRes.error.message);
+            }
+          }
         }
       } catch (err) {
         console.warn('Supabase submitReview exception:', err);
