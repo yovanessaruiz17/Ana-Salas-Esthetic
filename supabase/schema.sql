@@ -214,3 +214,28 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;
+
+-- ==============================================================================
+-- REALTIME REPLICATION (CRITICAL FOR CROSS-DEVICE LIVE SYNC)
+-- ==============================================================================
+-- Habilita la replicación en tiempo real para que todos los dispositivos reciban
+-- citas, servicios, categorías, reseñas y horarios al instante sin recargar la página.
+DO $$
+BEGIN
+  -- Enable realtime publication for all tables
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.service_categories;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.reviews;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.business_hours;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_exceptions;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+-- Grants para roles públicos y anónimos
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+

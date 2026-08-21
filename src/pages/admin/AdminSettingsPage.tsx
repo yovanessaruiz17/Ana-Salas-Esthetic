@@ -276,7 +276,7 @@ export const AdminSettingsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <a
                 href="https://supabase.com/dashboard"
                 target="_blank"
@@ -286,6 +286,14 @@ export const AdminSettingsPage: React.FC = () => {
                 <span>Obtener credenciales en Supabase Dashboard</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
+              <button
+                type="button"
+                onClick={() => setIsSqlModalOpen(true)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 hover:underline"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Ver Script SQL & Realtime</span>
+              </button>
             </div>
 
             <Button
@@ -299,7 +307,71 @@ export const AdminSettingsPage: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Netlify / Multi-device Sync Instructions Banner */}
+        <div className="p-4 sm:p-5 bg-white/80 rounded-2xl border border-amber-300 text-xs text-[#5C4F4B] space-y-2.5">
+          <div className="flex items-center gap-2 font-bold text-amber-900">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>¿Por qué las citas de otros dispositivos no se veían en tu panel?</span>
+          </div>
+          <p className="leading-relaxed">
+            Cuando abres la web desde <strong>otro celular o computador</strong> (como el de tus clientes), ese dispositivo no tiene el almacenamiento local de este navegador. Para que <strong>todos los dispositivos se conecten automáticamente a Supabase</strong>, debes configurar estas dos variables en Netlify:
+          </p>
+          <div className="bg-[#2D2726] text-amber-200 p-3 rounded-xl font-mono text-[11px] space-y-1 overflow-x-auto">
+            <div><span className="text-gray-400"># En Netlify: Site configuration &gt; Environment variables &gt; Add a variable</span></div>
+            <div className="text-emerald-400">VITE_SUPABASE_URL = <span className="text-white">{supabaseUrl || 'https://tu-proyecto.supabase.co'}</span></div>
+            <div className="text-emerald-400">VITE_SUPABASE_ANON_KEY = <span className="text-white">{supabaseAnonKey ? `${supabaseAnonKey.slice(0, 20)}...` : 'tu-anon-key'}</span></div>
+          </div>
+          <p className="text-[11px] text-gray-500">
+            💡 <strong>Paso 2:</strong> Asegúrate de haber ejecutado el script en Supabase SQL Editor para habilitar la <strong>replicación Realtime</strong> (así las citas nuevas aparecen en vivo sin recargar).
+          </p>
+        </div>
       </div>
+
+      {/* SQL Script Modal */}
+      <Modal
+        isOpen={isSqlModalOpen}
+        onClose={() => setIsSqlModalOpen(false)}
+        title="Script SQL para Supabase (Tablas y Realtime)"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-[#6E625F]">
+            Copia este script y ejecútalo en <strong>Supabase Dashboard &gt; SQL Editor &gt; New query &gt; Run</strong> para habilitar las tablas y la sincronización en tiempo real entre todos los dispositivos:
+          </p>
+
+          <div className="relative">
+            <pre className="bg-[#1E1B1A] text-amber-100 p-4 rounded-xl text-xs font-mono max-h-80 overflow-y-auto whitespace-pre-wrap select-all">
+{`-- Habilitar Realtime para sincronización en vivo
+ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.service_categories;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.reviews;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.business_hours;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_exceptions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+
+-- Grants de permisos para clientes públicos
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;`}
+            </pre>
+            <button
+              onClick={handleCopySql}
+              className="absolute top-3 right-3 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedSql ? '¡Copiado!' : 'Copiar SQL'}</span>
+            </button>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" size="sm" onClick={() => setIsSqlModalOpen(false)}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Business Identity Form */}
       <form

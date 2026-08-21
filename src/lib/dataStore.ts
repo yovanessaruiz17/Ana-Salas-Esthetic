@@ -283,6 +283,8 @@ class ReactiveDataStore {
   private listeners: Set<StoreListener> = new Set();
   private isInitialized = false;
   private isSyncingWithSupabase = false;
+  private realtimeChannel: any = null;
+  private pollInterval: any = null;
 
   constructor() {
     this.loadFromLocalStorage();
@@ -378,6 +380,14 @@ class ReactiveDataStore {
 
   public async reconnect() {
     this.isInitialized = false;
+    if (this.realtimeChannel) {
+      try {
+        supabase.removeChannel(this.realtimeChannel);
+      } catch (e) {
+        // ignore
+      }
+      this.realtimeChannel = null;
+    }
     await this.init();
   }
 
@@ -406,28 +416,32 @@ class ReactiveDataStore {
       }
 
       // 2. Categories
+      let hasRemoteCategories = false;
       try {
-        const { data: catData } = await supabase
+        const { data: catData, error: catErr } = await supabase
           .from('service_categories')
           .select('*')
           .order('display_order', { ascending: true });
 
-        if (catData && catData.length > 0) {
+        if (!catErr && catData && catData.length > 0) {
           this.categories = catData;
+          hasRemoteCategories = true;
         }
       } catch (e) {
         console.warn('Supabase: error fetching service_categories', e);
       }
 
       // 3. Services
+      let hasRemoteServices = false;
       try {
-        const { data: srvData } = await supabase
+        const { data: srvData, error: srvErr } = await supabase
           .from('services')
           .select('*, category:service_categories(*)')
           .order('display_order', { ascending: true });
 
-        if (srvData && srvData.length > 0) {
+        if (!srvErr && srvData && srvData.length > 0) {
           this.services = srvData;
+          hasRemoteServices = true;
         }
       } catch (e) {
         console.warn('Supabase: error fetching services', e);
@@ -435,14 +449,17 @@ class ReactiveDataStore {
 
       // 4. Bookings
       try {
-        const { data: bkData } = await supabase
+        const { data: bkData, error: bkErr } = await supabase
           .from('bookings')
           .select('*, service:services(*)')
           .order('appointment_date', { ascending: true })
           .order('start_time', { ascending: true });
 
-        if (bkData && bkData.length > 0) {
-          this.bookings = bkData;
+        if (!bkErr && Array.isArray(bkData)) {
+          // If we got a valid response from Supabase, use it (even if 0 bookings or existing ones)
+          if (bkData.length > 0 || hasRemoteServices || hasRemoteCategories) {
+            this.bookings = bkData;
+          }
         }
       } catch (e) {
         console.warn('Supabase: error fetching bookings', e);
@@ -450,13 +467,15 @@ class ReactiveDataStore {
 
       // 5. Reviews
       try {
-        const { data: revData } = await supabase
+        const { data: revData, error: revErr } = await supabase
           .from('reviews')
           .select('*, service:services(*)')
           .order('created_at', { ascending: false });
 
-        if (revData && revData.length > 0) {
-          this.reviews = revData;
+        if (!revErr && Array.isArray(revData)) {
+          if (revData.length > 0 || hasRemoteServices || hasRemoteCategories) {
+            this.reviews = revData;
+          }
         }
       } catch (e) {
         console.warn('Supabase: error fetching reviews', e);
@@ -464,12 +483,12 @@ class ReactiveDataStore {
 
       // 6. Business Hours
       try {
-        const { data: hoursData } = await supabase
+        const { data: hoursData, error: hoursErr } = await supabase
           .from('business_hours')
           .select('*')
           .order('day_of_week', { ascending: true });
 
-        if (hoursData && hoursData.length > 0) {
+        if (!hoursErr && hoursData && hoursData.length > 0) {
           this.businessHours = hoursData.map((h: any) => ({
             id: h.id,
             day_of_week: h.day_of_week,
@@ -486,18 +505,20 @@ class ReactiveDataStore {
 
       // 7. Schedule Exceptions
       try {
-        const { data: excData } = await supabase
+        const { data: excData, error: excErr } = await supabase
           .from('schedule_exceptions')
           .select('*')
           .order('date', { ascending: true });
 
-        if (excData && excData.length > 0) {
-          this.scheduleExceptions = excData.map((ex: any) => ({
-            id: ex.id,
-            closed_date: ex.date,
-            reason: ex.reason || 'Cerrado',
-            created_at: ex.created_at,
-          }));
+        if (!excErr && Array.isArray(excData)) {
+          if (excData.length > 0 || hasRemoteServices) {
+            this.scheduleExceptions = excData.map((ex: any) => ({
+              id: ex.id,
+              closed_date: ex.date,
+              reason: ex.reason || 'Cerrado',
+              created_at: ex.created_at,
+            }));
+          }
         }
       } catch (e) {
         console.warn('Supabase: error fetching schedule_exceptions', e);
@@ -515,24 +536,70 @@ class ReactiveDataStore {
     const creds = getSupabaseCredentials();
     if (!creds.isConfigured) return;
 
+    if (this.realtimeChannel) {
+      try {
+        supabase.removeChannel(this.realtimeChannel);
+      } catch (e) {
+        // ignore
+      }
+    }
+
     try {
-      const channel = supabase
-        .channel('db-realtime-sync')
+      this.realtimeChannel = supabase
+        .channel('ams-global-sync')
         .on(
           'postgres_changes',
           { event: '*', schema: 'public' },
-          () => {
+          (payload) => {
+            console.log('[Supabase Realtime Live Event]', payload.table, payload.eventType);
             this.fetchFromSupabase();
           }
         )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+        .subscribe((status) => {
+          console.log('[Supabase Realtime Status]', status);
+          if (status === 'SUBSCRIBED') {
+            this.fetchFromSupabase();
+          }
+        });
     } catch (e) {
       console.warn('Failed to setup realtime listener:', e);
     }
+
+    this.startBackgroundPolling();
+  }
+
+  private handleWindowFocus = () => {
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
+      this.fetchFromSupabase();
+    }
+  };
+
+  private handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      const creds = getSupabaseCredentials();
+      if (creds.isConfigured) {
+        this.fetchFromSupabase();
+      }
+    }
+  };
+
+  private startBackgroundPolling() {
+    if (this.pollInterval) clearInterval(this.pollInterval);
+    if (typeof window === 'undefined') return;
+
+    // Background polling every 8 seconds when active tab
+    this.pollInterval = setInterval(() => {
+      const creds = getSupabaseCredentials();
+      if (creds.isConfigured && document.visibilityState === 'visible') {
+        this.fetchFromSupabase();
+      }
+    }, 8000);
+
+    window.removeEventListener('focus', this.handleWindowFocus);
+    window.addEventListener('focus', this.handleWindowFocus);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
   // Push local data to Supabase (Initial seed or manual export)
