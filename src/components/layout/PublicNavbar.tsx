@@ -1,15 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Calendar, Sparkles, MessageCircle, Star, Phone } from 'lucide-react';
+import { Menu, X, Calendar, Sparkles, MessageCircle, Star, Phone, Download, Smartphone } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { Button } from '../common/Button';
 import { useSettings } from '../../contexts/SettingsContext';
+import { usePWA } from '../../contexts/PWAContext';
 
 export const PublicNavbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { settings } = useSettings();
+  const { isInstalled, openInstallModal, installApp, deferredPrompt } = usePWA();
+
+  const handleInstall = () => {
+    if (deferredPrompt) {
+      installApp();
+    } else {
+      openInstallModal();
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -73,7 +83,19 @@ export const PublicNavbar: React.FC = () => {
           </nav>
 
           {/* Desktop CTA */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
+            {!isInstalled && (
+              <button
+                id="navbar-install-app-btn"
+                onClick={handleInstall}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold tracking-wider uppercase text-[#8C6D40] bg-[#FAF3EB] hover:bg-[#F2ECE6] border border-[#E8DFC8] rounded-xl transition-all hover:scale-105 cursor-pointer shadow-xs"
+                title="Descargar e instalar app en tu PC o móvil"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Instalar App</span>
+              </button>
+            )}
+
             <Link to="/reservar">
               <Button
                 variant="gold"
@@ -121,6 +143,20 @@ export const PublicNavbar: React.FC = () => {
           </div>
 
           <div className="pt-2 border-t border-[#EFECE8] flex flex-col gap-2">
+            {!isInstalled && (
+              <button
+                id="mobile-menu-install-app-btn"
+                onClick={() => {
+                  setIsOpen(false);
+                  handleInstall();
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold tracking-wide text-[#8C6D40] bg-[#FAF3EB] hover:bg-[#F2ECE6] border border-[#E8DFC8] transition-colors cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Instalar App en tu Celular / PC</span>
+              </button>
+            )}
+
             <Link to="/reservar" className="w-full">
               <Button
                 variant="gold"

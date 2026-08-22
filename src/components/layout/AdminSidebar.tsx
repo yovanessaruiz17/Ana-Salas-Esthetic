@@ -11,9 +11,11 @@ import {
   User,
   LogOut,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePWA } from '../../contexts/PWAContext';
 
 interface AdminSidebarProps {
   isOpen: boolean;
@@ -22,6 +24,15 @@ interface AdminSidebarProps {
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onClose }) => {
   const { signOut } = useAuth();
+  const { isInstalled, openInstallModal, installApp, deferredPrompt } = usePWA();
+
+  const handleInstall = () => {
+    if (deferredPrompt) {
+      installApp();
+    } else {
+      openInstallModal();
+    }
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" />, end: true },
@@ -83,6 +94,20 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onClose }) =
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-[#3D3534] bg-[#231F20] space-y-2">
+          {!isInstalled && (
+            <button
+              id="admin-sidebar-install-pwa-btn"
+              onClick={handleInstall}
+              className="flex items-center justify-between w-full px-3.5 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider text-[#EBDBC9] bg-[#3D3534] hover:bg-[#4A403E] border border-[#C5A880]/30 transition-colors cursor-pointer"
+              title="Instalar panel en tu dispositivo"
+            >
+              <span className="flex items-center gap-2">
+                <Download className="w-4 h-4 text-[#C5A880]" />
+                Instalar App en PC / Celular
+              </span>
+            </button>
+          )}
+
           <a
             href="/"
             target="_blank"

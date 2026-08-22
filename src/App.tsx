@@ -3,7 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { ToastProvider } from './contexts/ToastContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { PWAProvider } from './contexts/PWAContext';
 import { ToastContainer } from './components/common/Toast';
+import { PWAInstallModal } from './components/common/PWAInstallModal';
+import { PWAInstallBanner } from './components/common/PWAInstallBanner';
 
 // Public Layout & Pages
 import { PublicLayout } from './components/layout/PublicLayout';
@@ -46,49 +49,53 @@ export const App: React.FC = () => {
       <ToastProvider>
         <SettingsProvider>
           <AuthProvider>
-            <ScrollToTop />
-            <ToastContainer />
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<PublicLayout />}>
-                <Route index element={<HomePage />} />
-                <Route path="servicios" element={<ServicesPage />} />
-                <Route path="servicios/:id" element={<ServiceDetailPage />} />
-                <Route path="reservar" element={<BookingPage />} />
-                <Route path="reservar/:serviceId" element={<BookingPage />} />
-                <Route
-                  path="reserva/confirmacion/:bookingId"
-                  element={<BookingConfirmationPage />}
-                />
-                <Route path="resenas" element={<ReviewsPage />} />
-                <Route path="resenas/nueva" element={<NewReviewPage />} />
-                <Route path="contacto" element={<ContactPage />} />
-                <Route path="privacidad" element={<PrivacyPage />} />
-                <Route path="terminos" element={<TermsPage />} />
-              </Route>
+            <PWAProvider>
+              <ScrollToTop />
+              <ToastContainer />
+              <PWAInstallModal />
+              <PWAInstallBanner />
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<PublicLayout />}>
+                  <Route index element={<HomePage />} />
+                  <Route path="servicios" element={<ServicesPage />} />
+                  <Route path="servicios/:id" element={<ServiceDetailPage />} />
+                  <Route path="reservar" element={<BookingPage />} />
+                  <Route path="reservar/:serviceId" element={<BookingPage />} />
+                  <Route
+                    path="reserva/confirmacion/:bookingId"
+                    element={<BookingConfirmationPage />}
+                  />
+                  <Route path="resenas" element={<ReviewsPage />} />
+                  <Route path="resenas/nueva" element={<NewReviewPage />} />
+                  <Route path="contacto" element={<ContactPage />} />
+                  <Route path="privacidad" element={<PrivacyPage />} />
+                  <Route path="terminos" element={<TermsPage />} />
+                </Route>
 
-              {/* Admin Authentication */}
-              <Route path="/admin/login" element={<AdminLoginPage />} />
+                {/* Admin Authentication */}
+                <Route path="/admin/login" element={<AdminLoginPage />} />
 
-              {/* Admin Protected Routes */}
-              <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<AdminDashboardPage />} />
-                <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="agenda" element={<AdminAgendaPage />} />
-                <Route path="citas" element={<AdminBookingsPage />} />
-                <Route path="reservas" element={<AdminBookingsPage />} />
-                <Route path="servicios" element={<AdminServicesPage />} />
-                <Route path="servicios/nuevo" element={<AdminServiceFormPage />} />
-                <Route path="servicios/editar/:id" element={<AdminServiceFormPage />} />
-                <Route path="horarios" element={<AdminBusinessHoursPage />} />
-                <Route path="resenas" element={<AdminReviewsPage />} />
-                <Route path="configuracion" element={<AdminSettingsPage />} />
-                <Route path="perfil" element={<AdminProfilePage />} />
-              </Route>
+                {/* Admin Protected Routes */}
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminDashboardPage />} />
+                  <Route path="dashboard" element={<AdminDashboardPage />} />
+                  <Route path="agenda" element={<AdminAgendaPage />} />
+                  <Route path="citas" element={<AdminBookingsPage />} />
+                  <Route path="reservas" element={<AdminBookingsPage />} />
+                  <Route path="servicios" element={<AdminServicesPage />} />
+                  <Route path="servicios/nuevo" element={<AdminServiceFormPage />} />
+                  <Route path="servicios/editar/:id" element={<AdminServiceFormPage />} />
+                  <Route path="horarios" element={<AdminBusinessHoursPage />} />
+                  <Route path="resenas" element={<AdminReviewsPage />} />
+                  <Route path="configuracion" element={<AdminSettingsPage />} />
+                  <Route path="perfil" element={<AdminProfilePage />} />
+                </Route>
 
-              {/* Catch-all 404 redirect */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                {/* Catch-all 404 redirect */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </PWAProvider>
           </AuthProvider>
         </SettingsProvider>
       </ToastProvider>

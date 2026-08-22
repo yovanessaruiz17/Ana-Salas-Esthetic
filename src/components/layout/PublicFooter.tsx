@@ -1,12 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, MapPin, Phone, Mail, Clock, Lock, Sparkles } from 'lucide-react';
+import { Instagram, MapPin, Phone, Mail, Clock, Lock, Sparkles, Download, Smartphone } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { useSettings } from '../../contexts/SettingsContext';
+import { usePWA } from '../../contexts/PWAContext';
 
 export const PublicFooter: React.FC = () => {
   const { settings } = useSettings();
+  const { isInstalled, openInstallModal, installApp, deferredPrompt } = usePWA();
   const currentYear = new Date().getFullYear();
+
+  const handleInstall = () => {
+    if (deferredPrompt) {
+      installApp();
+    } else {
+      openInstallModal();
+    }
+  };
 
   return (
     <footer className="bg-[#231F20] text-[#EFECE8] pt-16 pb-12 border-t border-[#38302E]">
@@ -120,20 +130,36 @@ export const PublicFooter: React.FC = () => {
           </div>
 
           {/* Column 4: Experience & Care */}
-          <div>
-            <h4 className="font-serif text-lg font-bold text-[#FAF8F5] mb-4 tracking-wide flex items-center gap-2">
+          <div className="space-y-4">
+            <h4 className="font-serif text-lg font-bold text-[#FAF8F5] mb-2 tracking-wide flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#C5A880]" />
               Garantía de Calidad
             </h4>
-            <p className="text-xs text-[#A39793] leading-relaxed mb-4">
+            <p className="text-xs text-[#A39793] leading-relaxed">
               Cada tratamiento es realizado con estrictos protocolos de bioseguridad, insumos desechables y productos de alta cosmética internacional.
             </p>
-            <Link
-              to="/resenas"
-              className="inline-flex items-center text-xs font-semibold text-[#C5A880] hover:text-[#E2D3BE] transition-colors"
-            >
-              ¿Ya tuviste tu cita? Déjanos tu reseña →
-            </Link>
+            <div>
+              <Link
+                to="/resenas"
+                className="inline-flex items-center text-xs font-semibold text-[#C5A880] hover:text-[#E2D3BE] transition-colors"
+              >
+                ¿Ya tuviste tu cita? Déjanos tu reseña →
+              </Link>
+            </div>
+
+            {/* PWA App Download Button */}
+            {!isInstalled && (
+              <div className="pt-2">
+                <button
+                  id="footer-install-pwa-button"
+                  onClick={handleInstall}
+                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#38302E] hover:bg-[#4A403E] text-[#EBDBC9] border border-[#C5A880]/30 transition-all text-xs font-semibold uppercase tracking-wider cursor-pointer group"
+                >
+                  <Download className="w-4 h-4 text-[#C5A880] group-hover:translate-y-0.5 transition-transform" />
+                  <span>Instalar App en tu Móvil / PC</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

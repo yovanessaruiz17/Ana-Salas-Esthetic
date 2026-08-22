@@ -17,9 +17,14 @@ import {
   Globe,
   UploadCloud,
   Code2,
+  Download,
+  Smartphone,
+  Monitor,
+  Zap,
 } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
+import { usePWA } from '../../contexts/PWAContext';
 import { Button } from '../../components/common/Button';
 import { Input, TextArea } from '../../components/common/Input';
 import { Modal } from '../../components/common/Modal';
@@ -35,6 +40,7 @@ import { dataStore } from '../../lib/dataStore';
 export const AdminSettingsPage: React.FC = () => {
   const { settings, updateSettings } = useSettings();
   const { showToast } = useToast();
+  const { isInstalled, openInstallModal, installApp, deferredPrompt, isIOS, isDesktop, isAndroid } = usePWA();
 
   const [formData, setFormData] = useState<SiteSettings>(settings);
   const [isSaving, setIsSaving] = useState(false);
@@ -398,6 +404,83 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role
           </div>
         </div>
       </Modal>
+
+      {/* PWA & Mobile / PC App Card */}
+      <div className="bg-gradient-to-br from-[#2D2726] to-[#1E1B1A] text-[#FAF8F5] rounded-3xl border border-[#3D3534] p-6 sm:p-8 shadow-md space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+          <div className="flex items-start gap-3">
+            <div className="p-3 rounded-2xl bg-[#C5A880] text-[#231F20]">
+              <Smartphone className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif font-bold text-lg text-[#FAF8F5]">
+                  Aplicación Web Progresiva (PWA Móvil & PC)
+                </h3>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                  isInstalled
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {isInstalled ? '🟢 Instalada en este dispositivo' : '⚡ Lista para Descargar'}
+                </span>
+              </div>
+              <p className="text-xs text-[#D8C7B2] mt-1 leading-relaxed max-w-2xl">
+                Permite a tus clientas y a ti instalar esta plataforma como app directa en Android, iPhone, iPad, Windows y Mac con 1 solo clic, acceso offline y velocidad ultra-rápida.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="gold"
+              size="md"
+              onClick={() => {
+                if (deferredPrompt) {
+                  installApp();
+                } else {
+                  openInstallModal();
+                }
+              }}
+              leftIcon={<Download className="w-4 h-4" />}
+            >
+              {isInstalled ? 'Ver Guía de Instalación' : 'Instalar App en este Dispositivo'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-[#D8C7B2]">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-1">
+            <div className="flex items-center gap-2 text-[#EBDBC9] font-bold text-sm">
+              <Smartphone className="w-4 h-4 text-[#C5A880]" />
+              <span>Android & iOS</span>
+            </div>
+            <p className="text-[11px] text-[#A39793]">
+              Acceso con icono nativo en pantalla de inicio sin ocupar memoria ni depender de tiendas de apps.
+            </p>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-1">
+            <div className="flex items-center gap-2 text-[#EBDBC9] font-bold text-sm">
+              <Monitor className="w-4 h-4 text-[#C5A880]" />
+              <span>PC & Mac (Escritorio)</span>
+            </div>
+            <p className="text-[11px] text-[#A39793]">
+              Ventana independiente con barra de tareas para gestionar citas y reservas como software de escritorio.
+            </p>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-1">
+            <div className="flex items-center gap-2 text-[#EBDBC9] font-bold text-sm">
+              <Zap className="w-4 h-4 text-[#C5A880]" />
+              <span>Service Worker & Cache</span>
+            </div>
+            <p className="text-[11px] text-[#A39793]">
+              Caché inteligente de recursos estáticos, manifest.json oficial y sincronización en tiempo real.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Business Identity Form */}
       <form
