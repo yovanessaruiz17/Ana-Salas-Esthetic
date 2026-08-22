@@ -672,6 +672,38 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role
           </Button>
         </div>
       </form>
+
+      {/* Developer & Software Author Information Card */}
+      <div className="bg-white rounded-3xl border border-[#E8DFC8] p-6 sm:p-7 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-[#FAF4ED] text-[#8C6D40] border border-[#E8DFC8]">
+            <Code2 className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-serif font-bold text-[#2D2726] text-base">
+                Desarrollado y Diseñado por Yordev (Yorle)
+              </h4>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#FAF4ED] text-[#8C6D40] border border-[#EBDBC9]">
+                Autoría Oficial
+              </span>
+            </div>
+            <p className="text-xs text-[#7A6D69] mt-0.5">
+              Todos los derechos de autor, diseño y desarrollo de software reservados a favor de <strong>Yordev</strong>.
+            </p>
+          </div>
+        </div>
+
+        <a
+          href="https://yordevctg17.netlify.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-[#8C6D40] bg-[#FAF4ED] hover:bg-[#F2ECE6] border border-[#E8DFC8] transition-colors"
+        >
+          <span>Visitar Yordev</span>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
     </div>
   );
 };

@@ -55,6 +55,27 @@ export const TermsPage: React.FC = () => {
             Es responsabilidad de la clienta informar previamente sobre alergias a cosméticos, tratamientos dermatológicos recientes (como peeling químico o retinoides) o afecciones cutáneas activas en la zona a tratar.
           </p>
         </section>
+
+        <section className="space-y-2 pt-2 border-t border-[#E8DFC8]">
+          <h2 className="font-serif text-lg font-bold text-[#2D2726]">
+            5. Propiedad Intelectual, Autoría y Derechos Reservados
+          </h2>
+          <p>
+            El diseño web, código fuente, arquitectura técnica, lógica de programación y desarrollo de esta Progressive Web App (PWA) han sido creados y desarrollados por <strong>Yordev (Yorle)</strong>.
+          </p>
+          <p>
+            Todos los derechos de desarrollo y autoría de software están reservados a favor de <strong>Yordev</strong>. Para conocer más sobre los servicios de desarrollo o contactar al creador, visite el portal profesional:{' '}
+            <a
+              href="https://yordevctg17.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#8C6D40] hover:text-[#554C4A] underline font-semibold transition-colors"
+            >
+              https://yordevctg17.netlify.app/
+            </a>
+            .
+          </p>
+        </section>
       </div>
     </div>
   );

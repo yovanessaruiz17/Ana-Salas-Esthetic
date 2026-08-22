@@ -12,6 +12,7 @@ import {
   LogOut,
   ExternalLink,
   Download,
+  Code2,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAuth } from '../../contexts/AuthContext';
@@ -127,6 +128,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onClose }) =
             <LogOut className="w-4 h-4" />
             <span>Cerrar Sesión</span>
           </button>
+
+          {/* Developer Credit */}
+          <div className="pt-2 border-t border-[#3D3534]/60 text-center">
+            <a
+              href="https://yordevctg17.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[10px] uppercase font-semibold tracking-wider text-[#A39793] hover:text-[#EBDBC9] transition-colors py-1 px-2 rounded hover:bg-[#3D3534]"
+              title="Sitio profesional de Yordev"
+            >
+              <Code2 className="w-3 h-3 text-[#C5A880]" />
+              <span>Desarrollado por Yordev (Yorle)</span>
+              <ExternalLink className="w-2.5 h-2.5 text-[#C5A880]" />
+            </a>
+          </div>
         </div>
       </aside>
     </>

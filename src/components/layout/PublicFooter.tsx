@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, MapPin, Phone, Mail, Clock, Lock, Sparkles, Download, Smartphone } from 'lucide-react';
+import { Instagram, MapPin, Phone, Mail, Clock, Lock, Sparkles, Download, Smartphone, ExternalLink, Code2 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { useSettings } from '../../contexts/SettingsContext';
 import { usePWA } from '../../contexts/PWAContext';
@@ -164,29 +164,40 @@ export const PublicFooter: React.FC = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#7A6D69] gap-4">
-          <div>
-            © {currentYear} {settings.business_name || 'Ana María Salas'}. Todos los derechos reservados.
+        <div className="pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-[#9E918E] gap-4 border-t border-[#38302E]/60 mt-8">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
+            <span>
+              © {currentYear} {settings.business_name || 'Ana María Salas'}.
+            </span>
+            <span className="hidden sm:inline text-[#554C4A]">•</span>
+            <span className="hidden sm:inline text-[#554C4A]">•</span>
+            <span className="text-[11px] text-[#8A7D7A]">Todos los derechos reservados a <a 
+             href="https://yordevctg17.netlify.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-[#EBDBC9] hover:text-[#C5A880] underline decoration-[#C5A880]/60 underline-offset-2 transition-colors inline-flex items-center gap-1"
+                title="Visitar sitio profesional de Yordev"
+              >Yordev</a></span>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
             <Link
-              to="/politica-privacidad"
-              className="hover:text-[#A39793] transition-colors"
+              to="/privacidad"
+              className="hover:text-[#EFECE8] transition-colors"
             >
               Política de Privacidad
             </Link>
             <Link
               to="/terminos"
-              className="hover:text-[#A39793] transition-colors"
+              className="hover:text-[#EFECE8] transition-colors"
             >
               Términos de Servicio
             </Link>
             <Link
               to="/admin/login"
-              className="hover:text-[#C5A880] transition-colors flex items-center gap-1.5"
+              className="hover:text-[#C5A880] transition-colors flex items-center gap-1.5 font-medium text-[#D8C7B2]"
             >
-              <Lock className="w-3 h-3" />
+              <Lock className="w-3 h-3 text-[#C5A880]" />
               <span>Acceso Administradora</span>
             </Link>
           </div>
